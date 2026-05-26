@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Chinese Stroke Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro/dist/index.js"></script>
+    
+    <!-- iOS Home Screen / PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hanzi App">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%232563eb%22/><text x=%2250%22 y=%2272%22 font-size=%2265%22 fill=%22white%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-weight=%22bold%22>字</text></svg>">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .chinese-text {
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        .char-card, .vocab-card {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .char-card.interactive:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .char-card.active {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+            background-color: #eff6ff;
+        }
+
+        .char-card.static {
+            background-color: transparent;
+            border-color: transparent;
+        }
+        
+        .vocab-card:hover {
+            border-color: #93c5fd;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .grid-bg {
+            background-image: 
+                linear-gradient(to bottom, transparent 49%, #e2e8f0 49%, #e2e8f0 51%, transparent 51%),
+                linear-gradient(to right, transparent 49%, #e2e8f0 49%, #e2e8f0 51%, transparent 51%),
+                linear-gradient(to bottom right, transparent 49%, #e2e8f0 49%, #e2e8f0 51%, transparent 51%),
+                linear-gradient(to top right, transparent 49%, #e2e8f0 49%, #e2e8f0 51%, transparent 51%);
+            background-size: 100% 100%;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <header class="bg-white border-b border-slate-200 py-8 mb-8 shadow-sm relative">
+        <div class="max-w-4xl mx-auto px-4 text-center mt-4">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3 flex justify-center items-center gap-3">
+                Chinese Stroke Visualizer
+            </h1>
+            <p class="text-slate-500 text-lg mb-6">Type any Chinese text below to see how it is written and add it to your vocabulary.</p>
+            
+            <form id="input-form" class="flex flex-col gap-4 max-w-2xl mx-auto">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input 
+                        type="text" 
+                        id="text-input" 
+                        class="chinese-text text-xl border-2 border-slate-200 rounded-xl px-4 py-3 w-full focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors" 
+                        placeholder="Chinese characters (e.g. 这是一个碗)" 
+                        value=""
+                        maxlength="20"
+                        required
+                    >
+                </div>
+                
+                <div class="flex flex-col sm:flex-row justify-center gap-3">
+                    <button 
+                        type="submit" 
+                        id="btn-visualize"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        Visualize
+                    </button>
+                    <button 
+                        type="button" 
+                        id="btn-save-vocab"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-8 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                        Save to Vocabulary
+                    </button>
+                </div>
+            </form>
+            <p class="text-xs text-slate-400 mt-4">Max 20 characters per phrase.</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4">
+        
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 mb-8 text-center relative overflow-hidden min-h-[250px]">
+            <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-6">Interactive Phrase (Click a character)</h2>
+            
+            <div id="sentence-container" class="flex flex-wrap justify-center items-end gap-3 md:gap-5 mb-4">
+                <p class="text-slate-500 py-8">Type a word above and click "Visualize" to begin.</p>
+            </div>
+            
+            <!-- Automatic Translation Output -->
+            <p id="phrase-translation" class="text-slate-500 text-lg italic min-h-[28px] mb-6"></p>
+
+            <div class="flex flex-col items-center gap-4 mt-6">
+                <button id="btn-play-all" class="hidden items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-full transition-colors shadow-sm">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    Animate Characters
+                </button>
+
+                <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-3 w-full max-w-2xl mt-2 border-t border-slate-100 pt-6">
+                    <button id="btn-play-phrase-audio" class="hidden flex-1 sm:flex-none justify-center items-center gap-2 bg-white border-2 border-slate-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-700 font-medium py-2 px-5 rounded-full transition-all shadow-sm text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        Normal Speed
+                    </button>
+                    <button id="btn-play-phrase-slowest" class="hidden flex-1 sm:flex-none justify-center items-center gap-2 bg-white border-2 border-slate-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-700 font-medium py-2 px-5 rounded-full transition-all shadow-sm text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        Slowest
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="detail-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 mb-8 opacity-0 transition-opacity duration-500 hidden">
+            <div class="flex flex-col items-center max-w-sm mx-auto">
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-4 w-full flex flex-col items-center relative grid-bg">
+                    <div id="main-animator" class="w-[180px] h-[180px]"></div>
+                </div>
+                
+                <div class="text-center w-full mb-6">
+                    <div class="flex justify-center items-center gap-3 mb-1">
+                        <h3 id="detail-char-title" class="text-4xl chinese-text font-bold text-slate-800"></h3>
+                        <button id="btn-play-char-audio" class="p-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        </button>
+                    </div>
+                    <p id="detail-char-pinyin" class="text-blue-600 font-semibold text-lg mb-1"></p>
+                    <p class="text-slate-400 text-xs uppercase tracking-wider font-medium">Selected Character</p>
+                </div>
+
+                <div class="flex w-full gap-2">
+                    <button id="btn-quiz-char" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium py-2 px-4 rounded-lg transition-colors border border-emerald-200 text-sm">
+                        Practice Stroke
+                    </button>
+                </div>
+                <p id="quiz-status" class="text-xs text-center mt-2 text-slate-500 h-4"></p>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    My Vocabulary
+                </h2>
+                <div class="flex items-center gap-3">
+                    <span id="vocab-loading" class="text-sm text-slate-400 hidden flex items-center gap-1">
+                        <svg class="animate-spin h-4 w-4 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Syncing...
+                    </span>
+                    <span id="vocab-count" class="bg-emerald-100 text-emerald-800 text-sm font-semibold px-3 py-1 rounded-full">0 Words</span>
+                </div>
+            </div>
+
+            <div id="vocab-empty-state" class="text-center py-10 text-slate-500">
+                <p>Your vocabulary list is empty.</p>
+                <p class="text-sm mt-1">Type a word above and click "Save to Vocabulary" to add it here!</p>
+            </div>
+
+            <div id="vocab-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 hidden"></div>
+        </section>
+
+    </main>
+
+    <!-- Custom Notification Toast -->
+    <div id="notification-toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <span id="notification-msg"></span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const HanziWriter = window.HanziWriter;
+        const { pinyin } = window.pinyinPro;
+
+        let app, auth, db, currentUser = null, unsubscribeVocab = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'chinese-stroke-app-default';
+        let isCloudActive = false;
+
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            isCloudActive = true;
+        } catch (error) {
+            console.error("Firebase initialization failed. Falling back to local memory.", error);
+        }
+
+        // State & Instances
+        let sentenceWriters = [];
+        let currentPhraseChars = [];
+        let mainWriter = null;
+        let activeCharIndex = -1;
+        let isAnimatingAll = false;
+        let currentFullText = "";
+        let currentTranslation = "";
+        
+        let vocabularyList = [];
+
+        // DOM Elements
+        const sentenceContainer = document.getElementById('sentence-container');
+        const detailSection = document.getElementById('detail-section');
+        const mainAnimatorContainer = document.getElementById('main-animator');
+        const detailCharTitle = document.getElementById('detail-char-title');
+        const detailCharPinyin = document.getElementById('detail-char-pinyin');
+        const quizStatus = document.getElementById('quiz-status');
+        
+        const inputForm = document.getElementById('input-form');
+        const textInput = document.getElementById('text-input');
+        const phraseTranslation = document.getElementById('phrase-translation');
+        
+        const vocabListContainer = document.getElementById('vocab-list');
+        const vocabEmptyState = document.getElementById('vocab-empty-state');
+        const vocabCountBadge = document.getElementById('vocab-count');
+        const vocabLoading = document.getElementById('vocab-loading');
+        
+        const btnSaveVocab = document.getElementById('btn-save-vocab');
+        const btnPlayAll = document.getElementById('btn-play-all');
+        const btnPlayPhraseAudio = document.getElementById('btn-play-phrase-audio');
+        const btnPlayPhraseSlowest = document.getElementById('btn-play-phrase-slowest');
+        const btnPlayCharAudio = document.getElementById('btn-play-char-audio');
+        const btnQuizChar = document.getElementById('btn-quiz-char');
+
+        const isChineseChar = (char) => /[\u4E00-\u9FFF]/.test(char);
+
+        function playAudio(text, rate = 0.85) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN'; 
+                utterance.rate = rate;    
+                window.speechSynthesis.speak(utterance);
+            } else {
+                showNotification("Text-to-speech is not supported in your browser.");
+            }
+        }
+
+        function showNotification(message) {
+            const toast = document.getElementById('notification-toast');
+            document.getElementById('notification-msg').innerText = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        async function loadPhrase(text) {
+            currentFullText = text;
+            textInput.value = text;
+            
+            // Set initial state for translation
+            currentTranslation = "Translating...";
+            phraseTranslation.innerText = currentTranslation;
+            
+            sentenceContainer.innerHTML = '';
+            sentenceWriters = [];
+            currentPhraseChars = text.split('').slice(0, 20); 
+            activeCharIndex = -1;
+            
+            detailSection.classList.add('hidden', 'opacity-0');
+            detailSection.classList.remove('opacity-100');
+            btnPlayAll.classList.add('hidden'); btnPlayAll.classList.remove('flex');
+            
+            btnPlayPhraseAudio.classList.add('hidden'); btnPlayPhraseAudio.classList.remove('flex');
+            btnPlayPhraseSlowest.classList.add('hidden'); btnPlayPhraseSlowest.classList.remove('flex');
+
+            let hasValidChars = false;
+
+            currentPhraseChars.forEach((char, index) => {
+                const isValid = isChineseChar(char);
+                if (isValid) hasValidChars = true;
+                
+                const charPinyin = isValid ? pinyin(char) : '';
+
+                const wrapper = document.createElement('div');
+                wrapper.className = `char-card flex flex-col items-center bg-white border-2 border-slate-100 rounded-xl p-2 w-[60px] sm:w-[85px] ${!isValid ? 'static' : 'interactive'}`;
+                wrapper.id = `card-${index}`;
+
+                const charTarget = document.createElement('div');
+                charTarget.id = `sentence-char-${index}`;
+                charTarget.className = `w-[40px] h-[40px] sm:w-[60px] sm:h-[60px] chinese-text flex justify-center items-center text-4xl sm:text-5xl ${!isValid ? 'text-slate-800' : ''}`;
+                
+                if (!isValid) {
+                    charTarget.innerText = char;
+                    if (/[。，、！？]/.test(char)) charTarget.classList.add('items-end', 'pb-2');
+                }
+                
+                wrapper.appendChild(charTarget);
+
+                if (isValid && charPinyin) {
+                    const pinyinLabel = document.createElement('span');
+                    pinyinLabel.className = 'text-xs sm:text-sm text-slate-500 mt-1 font-medium';
+                    pinyinLabel.innerText = charPinyin;
+                    wrapper.appendChild(pinyinLabel);
+                }
+
+                sentenceContainer.appendChild(wrapper);
+
+                if (isValid) {
+                    const writer = HanziWriter.create(charTarget.id, char, {
+                        width: window.innerWidth < 640 ? 40 : 60,
+                        height: window.innerWidth < 640 ? 40 : 60,
+                        padding: 5, strokeAnimationSpeed: 1.5, delayBetweenStrokes: 150,
+                        showOutline: true, strokeColor: '#334155', outlineColor: '#e2e8f0'
+                    });
+                    sentenceWriters.push({ writer, index, char });
+                    wrapper.addEventListener('click', () => selectCharacter(index, char, charPinyin));
+                }
+            });
+
+            if (hasValidChars) {
+                btnPlayAll.classList.remove('hidden'); btnPlayAll.classList.add('flex');
+                
+                btnPlayPhraseAudio.classList.remove('hidden'); btnPlayPhraseAudio.classList.add('flex');
+                btnPlayPhraseSlowest.classList.remove('hidden'); btnPlayPhraseSlowest.classList.add('flex');
+                
+                const firstValidIndex = currentPhraseChars.findIndex(isChineseChar);
+                if (firstValidIndex !== -1) {
+                    const char = currentPhraseChars[firstValidIndex];
+                    setTimeout(() => selectCharacter(firstValidIndex, char, pinyin(char)), 300);
+                }
+
+                // Fetch automatic translation
+                try {
+                    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=zh-CN|en`);
+                    const data = await res.json();
+                    if (data && data.responseData && data.responseData.translatedText) {
+                        currentTranslation = data.responseData.translatedText;
+                    } else {
+                        currentTranslation = "Translation unavailable";
+                    }
+                } catch (err) {
+                    console.error("Translation error:", err);
+                    currentTranslation = "Translation unavailable";
+                }
+                phraseTranslation.innerText = currentTranslation;
+
+            } else if (currentPhraseChars.length > 0) {
+                sentenceContainer.innerHTML = '<p class="text-slate-500 py-8">No valid Chinese characters found to animate.</p>';
+                phraseTranslation.innerText = "";
+            } else {
+                sentenceContainer.innerHTML = '<p class="text-slate-500 py-8">Type a word above and click "Visualize" to begin.</p>';
+                phraseTranslation.innerText = "";
+            }
+        }
+
+        function selectCharacter(index, char, charPinyin) {
+            if (isAnimatingAll) return; 
+            
+            document.querySelectorAll('.char-card').forEach(el => el.classList.remove('active'));
+            document.getElementById(`card-${index}`).classList.add('active');
+
+            detailSection.classList.remove('hidden');
+            setTimeout(() => { detailSection.classList.remove('opacity-0'); detailSection.classList.add('opacity-100'); }, 50);
+
+            detailCharTitle.innerText = char;
+            detailCharPinyin.innerText = charPinyin || '';
+            quizStatus.innerText = '';
+            
+            btnPlayCharAudio.onclick = () => playAudio(char, 0.85);
+            
+            activeCharIndex = index;
+
+            mainAnimatorContainer.innerHTML = ''; 
+            mainWriter = HanziWriter.create('main-animator', char, {
+                width: 180, height: 180, padding: 10, showOutline: true,
+                strokeAnimationSpeed: 1, delayBetweenStrokes: 200,
+                strokeColor: '#2563eb', radialColor: '#f1f5f9', outlineColor: '#cbd5e1'
+            });
+
+            mainWriter.animateCharacter();
+        }
+
+        async function animateFullSentence() {
+            if (isAnimatingAll || sentenceWriters.length === 0) return;
+            isAnimatingAll = true;
+            
+            const originalText = btnPlayAll.innerHTML;
+            btnPlayAll.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Playing...';
+            btnPlayAll.disabled = true; btnPlayAll.classList.add('opacity-75', 'cursor-not-allowed');
+
+            sentenceWriters.forEach(sw => sw.writer.hideCharacter());
+
+            for (let i = 0; i < sentenceWriters.length; i++) {
+                const sw = sentenceWriters[i];
+                document.querySelectorAll('.char-card').forEach(el => el.classList.remove('active'));
+                document.getElementById(`card-${sw.index}`).classList.add('active');
+                await sw.writer.animateCharacter();
+                await new Promise(resolve => setTimeout(resolve, 600)); 
+            }
+
+            btnPlayAll.innerHTML = originalText;
+            btnPlayAll.disabled = false; btnPlayAll.classList.remove('opacity-75', 'cursor-not-allowed');
+            document.querySelectorAll('.char-card').forEach(el => el.classList.remove('active'));
+            if (activeCharIndex !== -1) document.getElementById(`card-${activeCharIndex}`).classList.add('active');
+            isAnimatingAll = false;
+        }
+
+        function renderVocabulary() {
+            vocabListContainer.innerHTML = '';
+            
+            if (vocabularyList.length === 0) {
+                vocabEmptyState.classList.remove('hidden');
+                vocabListContainer.classList.add('hidden');
+                vocabCountBadge.innerText = '0 Words';
+                return;
+            }
+
+            vocabEmptyState.classList.add('hidden');
+            vocabListContainer.classList.remove('hidden');
+            vocabCountBadge.innerText = `${vocabularyList.length} Word${vocabularyList.length > 1 ? 's' : ''}`;
+
+            vocabularyList.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'vocab-card bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between relative group';
+                card.innerHTML = `
+                    <div class="mb-4">
+                        <div class="flex justify-between items-start">
+                            <h4 class="text-2xl font-bold chinese-text text-slate-800 mb-1">${item.chinese}</h4>
+                            <button class="delete-btn text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" data-id="${item.id}" title="Remove">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                        <p class="text-blue-600 text-sm font-medium mb-2">${item.pinyin}</p>
+                        <p class="text-slate-600 text-sm italic border-t border-slate-100 pt-2">${item.english || '<span class="text-slate-400">No translation</span>'}</p>
+                    </div>
+                    <div class="flex gap-2 mt-auto">
+                        <button class="view-btn flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-1.5 rounded-lg text-sm font-medium transition-colors" data-id="${item.id}">
+                            Practice
+                        </button>
+                        <button class="audio-btn bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 p-1.5 rounded-lg transition-colors" data-id="${item.id}" title="Play Audio">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        </button>
+                    </div>
+                `;
+                vocabListContainer.appendChild(card);
+            });
+
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const item = vocabularyList.find(i => i.id === id);
+                    if (item) {
+                        loadPhrase(item.chinese);
+                        document.getElementById('sentence-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            });
+
+            document.querySelectorAll('.audio-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const item = vocabularyList.find(i => i.id === id);
+                    if (item) playAudio(item.chinese, 0.85);
+                });
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    if (isCloudActive && currentUser) {
+                        try {
+                            await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocabulary', id));
+                            showNotification("Removed from Vocabulary");
+                        } catch(err) { console.error(err); showNotification("Failed to remove word."); }
+                    } else {
+                        vocabularyList = vocabularyList.filter(i => i.id !== id);
+                        renderVocabulary();
+                        showNotification("Removed from Vocabulary");
+                    }
+                });
+            });
+        }
+
+        async function saveToVocabulary() {
+            const zhText = textInput.value.trim();
+            let enText = currentTranslation === "Translating..." || currentTranslation === "Translation unavailable" ? "" : currentTranslation;
+
+            if (!zhText) return showNotification("Please enter Chinese characters first.");
+            if (!zhText.split('').some(isChineseChar)) return showNotification("No valid Chinese characters to save.");
+
+            const exists = vocabularyList.some(item => item.chinese === zhText);
+            if (exists) return showNotification("This word is already in your vocabulary.");
+
+            const btn = document.getElementById('btn-save-vocab');
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            showNotification("Saving...");
+
+            // Fetch translation if not available or if the text differs from visualized text
+            if (!enText || zhText !== currentFullText) {
+                try {
+                    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(zhText)}&langpair=zh-CN|en`);
+                    const data = await res.json();
+                    if (data && data.responseData && data.responseData.translatedText) {
+                        enText = data.responseData.translatedText;
+                    }
+                } catch (err) {
+                    console.error("Translation error:", err);
+                }
+            }
+
+            const pinyinString = pinyin(zhText, { type: 'string' });
+            const docData = { chinese: zhText, english: enText, pinyin: pinyinString, timestamp: Date.now() };
+
+            if (isCloudActive && currentUser) {
+                try {
+                    const vocabRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'vocabulary');
+                    await addDoc(vocabRef, docData);
+                    
+                    showNotification("Saved to My Vocabulary!");
+                    document.getElementById('vocab-list').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } catch (error) {
+                    console.error("Save error", error);
+                    showNotification("Error saving word.");
+                } finally {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-70');
+                }
+            } else {
+                docData.id = 'local_' + Date.now();
+                vocabularyList.unshift(docData);
+                renderVocabulary();
+                showNotification("Saved to My Vocabulary!");
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+            }
+        }
+
+        async function initAuth() {
+            if (!auth) return;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+        }
+
+        function setupVocabListener() {
+            if (!currentUser || !db) return;
+            vocabLoading.classList.remove('hidden');
+            
+            const vocabRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'vocabulary');
+            unsubscribeVocab = onSnapshot(vocabRef, (snapshot) => {
+                vocabularyList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                vocabularyList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                renderVocabulary();
+                vocabLoading.classList.add('hidden');
+            }, (error) => {
+                console.error("Listen failed:", error);
+                vocabLoading.classList.add('hidden');
+            });
+        }
+
+        if (isCloudActive) {
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    setupVocabListener();
+                } else {
+                    if (unsubscribeVocab) unsubscribeVocab();
+                    vocabularyList = [];
+                    renderVocabulary();
+                }
+            });
+            initAuth();
+        }
+
+        inputForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = textInput.value.trim();
+            if (text) loadPhrase(text);
+        });
+
+        btnSaveVocab.addEventListener('click', saveToVocabulary);
+        btnPlayAll.addEventListener('click', animateFullSentence);
+        
+        btnPlayPhraseAudio.addEventListener('click', () => playAudio(currentFullText, 0.85));
+        btnPlayPhraseSlowest.addEventListener('click', () => playAudio(currentFullText, 0.1));
+
+        btnQuizChar.addEventListener('click', () => {
+            if (mainWriter) {
+                mainWriter.animateCharacter({
+                    onComplete: () => {
+                        setTimeout(() => {
+                            quizStatus.innerText = 'Draw the first stroke!';
+                            mainWriter.quiz({
+                                onMistake: function() { quizStatus.innerText = 'Oops, try again!'; quizStatus.classList.add('text-red-500'); },
+                                onCorrectStroke: function(d) { quizStatus.innerText = `Good! Stroke ${d.strokeNum + 1} of ${d.totalStrokes}`; quizStatus.classList.remove('text-red-500'); },
+                                onComplete: function() { quizStatus.innerText = `Excellent! You finished writing it.`; quizStatus.classList.add('text-emerald-600'); }
+                            });
+                        }, 500);
+                    }
+                });
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (textInput.value) {
+                loadPhrase(textInput.value);
+            }
+            if (!isCloudActive) renderVocabulary(); 
+        });
+
+    </script>
+</body>
+</html>
