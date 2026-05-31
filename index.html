@@ -211,7 +211,6 @@
     </div>
 
     <script>
-        const HanziWriter = window.HanziWriter;
         const { pinyin } = window.pinyinPro;
 
         // -------------------------------------------------------------
@@ -250,10 +249,12 @@
         // First Visit Check & Preload logic
         // Updated local storage key to force a fresh preload for this version
         const hasVisited = localStorage.getItem('hasVisitedChineseAppV3'); 
+        let shouldPreloadBowl = false;
         
         if (!hasVisited) {
             localStorage.setItem('hasVisitedChineseAppV3', 'true');
             if (vocabularyList.length === 0) {
+                shouldPreloadBowl = true;
                 vocabularyList.push({
                     id: 'local_' + Date.now(),
                     chinese: '这是一个碗。',
@@ -641,7 +642,7 @@
             const btn = document.getElementById('btn-save-vocab');
             btn.disabled = true;
             btn.classList.add('opacity-70');
-            showNotification("Saving...");
+            showNotification("Translating and saving...");
 
             // Fetch translation if not available or if the text differs from visualized text
             if (!enText || zhText !== currentFullText) {
@@ -706,7 +707,7 @@
 
         // Final initialization
         window.addEventListener('DOMContentLoaded', () => {
-            if (!hasVisited) {
+            if (shouldPreloadBowl) {
                 loadPhrase('这是一个碗。');
             } else if (textInput.value) {
                 loadPhrase(textInput.value);
